@@ -122,9 +122,9 @@ class Enemy(pygame.sprite.Sprite):
         self.count = 0
         self.y_vel += 7
 
-    def soco(self):
-        self.count = 0
-        self.x_vel += 7
+    # def soco_left(self):
+    #     self.x_vel += 7
+    #     self.move(-100, -100)
 
     def update_sprite(self):
         sprite_sheet = 'idle'
@@ -172,6 +172,8 @@ class Player(pygame.sprite.Sprite):
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
+        self.hit_soco = False
+        self.hit_soco_count = 0
 
     def jump(self):
         self.y_vel = -self.GRAVITY * 8
@@ -187,6 +189,10 @@ class Player(pygame.sprite.Sprite):
     def make_hit(self):
         self.hit = True
         self.hit_count = 0
+
+    def make_hit_soco(self):
+        self.hit_soco = True
+        self.hit_soco_count = 0
 
     def move_left(self, vel):
         self.x_vel = -vel
@@ -210,6 +216,12 @@ class Player(pygame.sprite.Sprite):
             self.hit = False
             self.hit_count = 0
 
+        if self.hit_soco:
+            self.hit_soco_count += 1
+        if self.hit_soco_count > 10:
+            self.hit_soco = False
+            self.hit_soco_count = 0
+
         self.fall_count += 1
         self.update_sprite()
 
@@ -222,14 +234,16 @@ class Player(pygame.sprite.Sprite):
         self.count = 0
         self.y_vel += 7
 
-    def soco(self):
-        self.count = 0
-        self.x_vel += 7
+    # def soco_left(self):
+    #     self.x_vel += 7
+    #     self.move(-100, 0)
 
     def update_sprite(self):
         sprite_sheet = 'idle'
         if self.hit:
             sprite_sheet = 'hit'
+        if self.hit_soco:
+            sprite_sheet = 'hit_soco'
         if self.y_vel < 0:
             if self.jump_count == 1:
                 sprite_sheet == 'jump'
@@ -237,14 +251,17 @@ class Player(pygame.sprite.Sprite):
                 sprite_sheet = 'double_jump'
         elif self.y_vel > self.GRAVITY * 2:
             sprite_sheet = 'fall'
-        elif self.x_vel != 0:
+        elif self.x_vel != 0 and (self.hit == False and self.hit_soco == False):
             sprite_sheet = 'run'
 
         sprite_sheet_name = sprite_sheet + '_' + self.direction
         sprites = self.SPRITES[sprite_sheet_name]
         sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
         self.sprite = sprites[sprite_index]
-        self.animation_count += 1
+        if sprite_sheet == 'hit_soco':
+            self.animation_count += 10
+        else:
+            self.animation_count += 1
         self.update()
 
     def update(self):
@@ -356,8 +373,15 @@ def collide(player, objects, dx):
     player.update()
     return collided_object
 
+def soco(self, s_player):
+    if self.direction == 'right':
+        s_player.move(100, 0)
+        s_player.make_hit_soco()
+    else:
+        s_player.move(-100, 0)
+        s_player.make_hit_soco()
 
-def handle_move(player, objects, enemy):
+def handle_move(player, objects):
     keys = pygame.key.get_pressed()
 
     player.x_vel = 0
@@ -369,10 +393,7 @@ def handle_move(player, objects, enemy):
     if keys[pygame.K_RIGHT] and not collide_right:
         player.move_right(PLAYER_VEL)
 
-    if keys[pygame.K_LSHIFT] and collide_left:
-        enemy.soco()
-    if keys[pygame.K_LSHIFT] and collide_right:
-        enemy.soco()
+
 
     vertical_collide = handle_vertical_collision(player, objects, player.y_vel)
     to_check = [collide_left, collide_right, *vertical_collide]
@@ -442,11 +463,15 @@ def main(window):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_w and enemy.jump_count < 2:
                     enemy.jump()
+                    
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_CAPSLOCK and pygame.sprite.collide_mask(player, enemy):
+                    soco(enemy, player)
 
         player.loop(FPS)
         fire.loop()
         enemy.loop(FPS)
-        handle_move(player, objects, enemy)
+        handle_move(player, objects)
         handle_enemy_move(enemy, objects)
         draw(window, background, bg_image, player, objects, offset_x, enemy)
 
