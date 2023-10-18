@@ -14,6 +14,7 @@ BG_COLOR = (255, 255, 255)
 WIDTH, HEIGHT = 1000, 800
 FPS = 60
 PLAYER_VEL = 5
+ENEMY_VEL = 5
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -51,6 +52,107 @@ def get_block(size):
     rect = pygame.Rect(96, 0, size, size)
     surface.blit(image, (0, 0), rect)
     return pygame.transform.scale2x(surface)
+
+
+class Enemy(pygame.sprite.Sprite):
+    COLOR = (255, 0, 0)
+    GRAVITY = 1
+    SPRITES = load_sprite_sheets('MainCharacters', 'MaskDude', 32, 32, True)
+    ANIMATION_DELAY = 3
+
+    def __init__(self, x, y, width, height):
+        super().__init__()
+        self.rect = pygame.Rect(x, y, width, height)
+        self.x_vel = 0
+        self.y_vel = 0
+        self.mask = None
+        self.direction = 'left'
+        self.animation_count = 0
+        self.fall_count = 0
+        self.jump_count = 0
+        self.hit = False
+        self.hit_count = 0
+
+    def jump(self):
+        self.y_vel = -self.GRAVITY * 8
+        self.animation_count = 0
+        self.jump_count += 1
+        if self.jump_count == 2:
+            self.fall_count = 14
+
+    def move(self, dx, dy):
+        self.rect.x += dx
+        self.rect.y += dy
+
+    def make_hit(self):
+        self.hit = True
+        self.hit_count = 0
+
+    def move_left(self, vel):
+        self.x_vel = -vel
+        if self.direction != 'left':
+            self.direction = 'left'
+            self.animation_count = 0
+
+    def move_right(self, vel):
+        self.x_vel = vel
+        if self.direction != 'right':
+            self.direction = 'right'
+            self.animation_count = 0
+
+    def loop(self, fps):
+        self.y_vel += min(1, (self.fall_count / fps) * self.GRAVITY)
+        self.move(self.x_vel, self.y_vel)
+
+        if self.hit:
+            self.hit_count += 1
+        if self.hit_count > fps * 2:
+            self.hit = False
+            self.hit_count = 0
+
+        self.fall_count += 1
+        self.update_sprite()
+
+    def landed(self):
+        self.fall_count = 0
+        self.y_vel = 0
+        self.jump_count = 0
+
+    def hit_head(self):
+        self.count = 0
+        self.y_vel += 7
+
+    def soco(self):
+        self.count = 0
+        self.x_vel += 7
+
+    def update_sprite(self):
+        sprite_sheet = 'idle'
+        if self.hit:
+            sprite_sheet = 'hit'
+        if self.y_vel < 0:
+            if self.jump_count == 1:
+                sprite_sheet == 'jump'
+            elif self.jump_count == 2:
+                sprite_sheet = 'double_jump'
+        elif self.y_vel > self.GRAVITY * 2:
+            sprite_sheet = 'fall'
+        elif self.x_vel != 0:
+            sprite_sheet = 'run'
+
+        sprite_sheet_name = sprite_sheet + '_' + self.direction
+        sprites = self.SPRITES[sprite_sheet_name]
+        sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
+        self.sprite = sprites[sprite_index]
+        self.animation_count += 1
+        self.update()
+
+    def update(self):
+        self.rect = self.sprite.get_rect(topleft=(self.rect.x, self.rect.y))
+        self.mask = pygame.mask.from_surface(self.sprite)
+
+    def draw(self, win, offset_x):
+        win.blit(self.sprite, (self.rect.x - offset_x, self.rect.y))
 
 class Player(pygame.sprite.Sprite):
     COLOR = (255, 0, 0)
@@ -119,6 +221,10 @@ class Player(pygame.sprite.Sprite):
     def hit_head(self):
         self.count = 0
         self.y_vel += 7
+
+    def soco(self):
+        self.count = 0
+        self.x_vel += 7
 
     def update_sprite(self):
         sprite_sheet = 'idle'
@@ -208,7 +314,7 @@ def get_background(name):
             tiles.append(pos)
     return tiles, image
 
-def draw(window, background, bg_image, player, objects, offset_x):
+def draw(window, background, bg_image, player, objects, offset_x, enemy):
     for tile in background:
         window.blit(bg_image, tile)
 
@@ -216,6 +322,8 @@ def draw(window, background, bg_image, player, objects, offset_x):
         obj.draw(window, offset_x)
 
     player.draw(window, offset_x)
+
+    enemy.draw(window, offset_x)
 
     pygame.display.update()
 
@@ -235,6 +343,7 @@ def handle_vertical_collision(player, objects, dy):
     
     return collided_objects
 
+
 def collide(player, objects, dx):
     player.move(dx, 0)
     player.update()
@@ -247,7 +356,8 @@ def collide(player, objects, dx):
     player.update()
     return collided_object
 
-def handle_move(player, objects):
+
+def handle_move(player, objects, enemy):
     keys = pygame.key.get_pressed()
 
     player.x_vel = 0
@@ -259,11 +369,44 @@ def handle_move(player, objects):
     if keys[pygame.K_RIGHT] and not collide_right:
         player.move_right(PLAYER_VEL)
 
+    if keys[pygame.K_LSHIFT] and collide_left:
+        enemy.soco()
+    if keys[pygame.K_LSHIFT] and collide_right:
+        enemy.soco()
+
     vertical_collide = handle_vertical_collision(player, objects, player.y_vel)
     to_check = [collide_left, collide_right, *vertical_collide]
     for obj in to_check:
         if obj and obj.name == "fire":
             player.make_hit()
+
+# def handle_soco(player, enemy):
+#     keys = pygame.key.get_pressed()
+#     collide_left = collide(enemy, player, 3)
+#     collide_right = collide(enemy, player, 3)
+
+#     if keys[pygame.K_LSHIFT] and collide_left:
+#         enemy.move_left(ENEMY_VEL)
+#     if keys[pygame.K_LSHIFT] and collide_right:
+#         enemy.move_right(ENEMY_VEL)
+
+def handle_enemy_move(enemy, objects):
+    keys = pygame.key.get_pressed()
+
+    enemy.x_vel = 0
+    collide_left = collide(enemy, objects, -ENEMY_VEL * 2)
+    collide_right = collide(enemy, objects, ENEMY_VEL * 2)
+
+    if keys[pygame.K_a] and not collide_left:
+        enemy.move_left(ENEMY_VEL)
+    if keys[pygame.K_d] and not collide_right:
+        enemy.move_right(ENEMY_VEL)
+
+    vertical_collide = handle_vertical_collision(enemy, objects, enemy.y_vel)
+    to_check = [collide_left, collide_right, *vertical_collide]
+    for obj in to_check:
+        if obj and obj.name == "fire":
+            enemy.make_hit()
 
 def main(window):
     clock = pygame.time.Clock()
@@ -272,6 +415,7 @@ def main(window):
     block_size = 96
 
     player = Player(100, 100, 50, 50)
+    enemy = Enemy(200,200, 100, 100)
     fire = Fire(block_size * 5, HEIGHT - block_size - 64, 16, 32)
     fire.on()
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) 
@@ -292,13 +436,19 @@ def main(window):
                 break
 
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE and player.jump_count < 2:
+                if event.key == pygame.K_UP and player.jump_count < 2:
                     player.jump()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_w and enemy.jump_count < 2:
+                    enemy.jump()
 
         player.loop(FPS)
         fire.loop()
-        handle_move(player, objects)
-        draw(window, background, bg_image, player, objects, offset_x)
+        enemy.loop(FPS)
+        handle_move(player, objects, enemy)
+        handle_enemy_move(enemy, objects)
+        draw(window, background, bg_image, player, objects, offset_x, enemy)
 
         if((player.rect.right - offset_x >= WIDTH - scrol_area_width) and player.x_vel > 0) or (
             (player.rect.left - offset_x <= scrol_area_width) and player.x_vel < 0):
