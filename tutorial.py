@@ -15,6 +15,7 @@ WIDTH, HEIGHT = 1000, 800
 FPS = 60
 PLAYER_VEL = 5
 ENEMY_VEL = 5
+TEMPO = 0
 
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -373,14 +374,6 @@ def collide(player, objects, dx):
     player.update()
     return collided_object
 
-def soco(self, s_player):
-    if self.direction == 'right':
-        s_player.move(100, 0)
-        s_player.make_hit_soco()
-    else:
-        s_player.move(-100, 0)
-        s_player.make_hit_soco()
-
 def handle_move(player, objects):
     keys = pygame.key.get_pressed()
 
@@ -401,16 +394,6 @@ def handle_move(player, objects):
         if obj and obj.name == "fire":
             player.make_hit()
 
-# def handle_soco(player, enemy):
-#     keys = pygame.key.get_pressed()
-#     collide_left = collide(enemy, player, 3)
-#     collide_right = collide(enemy, player, 3)
-
-#     if keys[pygame.K_LSHIFT] and collide_left:
-#         enemy.move_left(ENEMY_VEL)
-#     if keys[pygame.K_LSHIFT] and collide_right:
-#         enemy.move_right(ENEMY_VEL)
-
 def handle_enemy_move(enemy, objects):
     keys = pygame.key.get_pressed()
 
@@ -428,6 +411,7 @@ def handle_enemy_move(enemy, objects):
     for obj in to_check:
         if obj and obj.name == "fire":
             enemy.make_hit()
+    
 
 def main(window):
     clock = pygame.time.Clock()
@@ -435,19 +419,23 @@ def main(window):
 
     block_size = 96
 
+    levou_soco = False
+    levou_soco_S = False
+
     player = Player(100, 100, 50, 50)
     enemy = Enemy(200,200, 100, 100)
-    fire = Fire(block_size * 5, HEIGHT - block_size - 64, 16, 32)
-    fire.on()
+    # fire = Fire(block_size * 5, HEIGHT - block_size - 64, 16, 32)
+    # fire.on()
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) 
             for i in range(-WIDTH // block_size, (WIDTH * 2) // block_size)]
     objects = [*floor, Block(0,HEIGHT - block_size * 2, block_size), 
-               Block(block_size * 3, HEIGHT - block_size * 4, block_size), fire]
+               Block(block_size * 3, HEIGHT - block_size * 4, block_size)]
     
     offset_x = 0
     scrol_area_width = 200
 
     run = True
+    cont = 0
     while run:
         clock.tick(FPS)
 
@@ -465,11 +453,49 @@ def main(window):
                     enemy.jump()
                     
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_CAPSLOCK and pygame.sprite.collide_mask(player, enemy):
-                    soco(enemy, player)
+                if event.key == pygame.K_LSHIFT and pygame.sprite.collide_mask(player, enemy):
+                    levou_soco = True
+                    
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RCTRL and pygame.sprite.collide_mask(enemy, player):
+                    levou_soco_S = True
+
+                        
 
         player.loop(FPS)
-        fire.loop()
+        # fire.loop()
+        # teste(player, levou_soco)
+        if levou_soco == True and cont <= 10:
+            print(player.direction)
+            if enemy.direction == 'right':
+                player.rect.x += 20
+                player.rect.y -= 5
+                cont += 1
+                player.y_vel = 0
+            else:
+                player.rect.x -= 20
+                player.rect.y -= 5
+                cont += 1
+                player.y_vel = 0
+        if cont == 10:
+            cont = 0
+            levou_soco = False
+
+        if levou_soco_S == True and cont <= 10:
+            if player.direction == 'right':
+                enemy.rect.x += 20
+                enemy.rect.y -= 5
+                cont += 1
+                enemy.y_vel = 0
+            else:
+                enemy.rect.x -= 20
+                enemy.rect.y -= 5
+                cont += 1
+                enemy.x_vel = 0
+        if cont == 10:
+            cont = 0
+            levou_soco_S = False
+        # levou_soco = teste
         enemy.loop(FPS)
         handle_move(player, objects)
         handle_enemy_move(enemy, objects)
@@ -478,6 +504,10 @@ def main(window):
         if((player.rect.right - offset_x >= WIDTH - scrol_area_width) and player.x_vel > 0) or (
             (player.rect.left - offset_x <= scrol_area_width) and player.x_vel < 0):
             offset_x += player.x_vel
+
+        if((enemy.rect.right - offset_x >= WIDTH - scrol_area_width) and enemy.x_vel > 0) or (
+            (enemy.rect.left - offset_x <= scrol_area_width) and enemy.x_vel < 0):
+            offset_x += enemy.x_vel
 
     pygame.quit()
     quit
