@@ -427,7 +427,7 @@ def main(window):
     # fire = Fire(block_size * 5, HEIGHT - block_size - 64, 16, 32)
     # fire.on()
     floor = [Block(i * block_size, HEIGHT - block_size, block_size) 
-            for i in range(-WIDTH // block_size, (WIDTH * 2) // block_size)]
+            for i in range(6)]
     objects = [*floor, Block(0,HEIGHT - block_size * 2, block_size), 
                Block(block_size * 3, HEIGHT - block_size * 4, block_size)]
     
